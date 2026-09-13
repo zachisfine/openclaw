@@ -19,6 +19,10 @@ import { GatewayClientRequestError } from "../../gateway/client.js";
 import { withTestDir } from "../../test-helpers/temp-dir.js";
 import { createTestRegistry } from "../../test-utils/channel-plugins.js";
 import { createSessionConversationTestRegistry } from "../../test-utils/session-conversation-registry.js";
+import {
+  getPreparedModelRuntimePluginGeneration,
+  withPreparedModelRuntimePluginGenerationScope,
+} from "../prepared-model-runtime-generation-scope.js";
 import { textAssistant } from "../test-helpers/sparse-transcript.test-support.js";
 import { extractStoredAssistantText } from "./chat-history-text.js";
 
@@ -1666,6 +1670,22 @@ describe("sessions_send gating", () => {
 
     expect(inheritedFence).toBeUndefined();
     expect(parentTranscriptWriteCalls).toBe(0);
+  });
+
+  it("re-admits detached A2A work outside the caller's prepared runtime generation", async () => {
+    const { runSessionsSendA2AFlow } = await import("./sessions-send-tool.a2a.js");
+    const callerGeneration = {} as never;
+    let inheritedGeneration: unknown;
+    vi.mocked(runSessionsSendA2AFlow).mockImplementationOnce(async () => {
+      inheritedGeneration = getPreparedModelRuntimePluginGeneration();
+    });
+
+    await withPreparedModelRuntimePluginGenerationScope(callerGeneration, async () => {
+      await executeFireAndForgetA2AFrom(MAIN_AGENT_SESSION_KEY);
+    });
+    await vi.waitFor(() => expect(runSessionsSendA2AFlow).toHaveBeenCalledOnce());
+
+    expect(inheritedGeneration).toBeUndefined();
   });
 
   it("canonicalizes aliased requester keys for same-session A2A delivery", async () => {
