@@ -438,6 +438,48 @@ describe("workboard tools", () => {
     expect(dispatch.promoted).toEqual([expect.objectContaining({ id: child.id, status: "ready" })]);
   });
 
+  it("completes claimed work through the registered tool when proofId is empty", async () => {
+    const store = createWorkboardSqliteTestStore();
+    const tools = new Map(
+      createWorkboardTools({
+        store,
+        context: { agentId: "main" },
+      }).map((tool) => [tool.name, tool]),
+    );
+    const card = await store.create({ title: "Inline proof" });
+    const claimed = readPayload(
+      await tools.get("workboard_claim")?.execute("call-claim", { id: card.id }),
+    );
+
+    const completed = readPayload(
+      await tools.get("workboard_complete")?.execute("call-complete", {
+        id: card.id,
+        token: claimed.token,
+        summary: "Completed with inline proof.",
+        proofId: "",
+        proof: {
+          status: "passed",
+          label: "Regression proof",
+          command: "pnpm test extensions/workboard/src/tools.test.ts",
+          note: "The registered completion tool accepts an empty optional proof id.",
+        },
+      }),
+    );
+
+    expect(completed.card).toMatchObject({
+      status: "done",
+      metadata: {
+        proof: [
+          expect.objectContaining({
+            id: expect.any(String),
+            status: "passed",
+            label: "Regression proof",
+          }),
+        ],
+      },
+    });
+  });
+
   it("redacts claim tokens from dispatch tool results", async () => {
     const store = createWorkboardSqliteTestStore();
     const tools = new Map(

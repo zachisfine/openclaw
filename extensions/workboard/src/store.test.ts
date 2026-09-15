@@ -2058,6 +2058,18 @@ describe("WorkboardStore", () => {
     expect(completed.metadata?.proof?.[0]?.status).toBe("passed");
   });
 
+  it("continues to reject null and non-string proof ids", async () => {
+    const store = createWorkboardSqliteTestStore();
+    const card = await store.create({ title: "Invalid proofId" });
+
+    await expect(store.complete(card.id, { proofId: null })).rejects.toThrow(
+      "proofId must be a non-empty string.",
+    );
+    await expect(store.complete(card.id, { proofId: 42 })).rejects.toThrow(
+      "proofId must be a non-empty string.",
+    );
+  });
+
   it("resolves only the explicitly correlated proof across identical retries", async () => {
     const store = createWorkboardSqliteTestStore();
     const proofInput = { command: "review poem", note: "Checked each line." };
